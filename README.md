@@ -178,6 +178,30 @@ dotnet publish -c Release
 ./build/package.sh 1.0.0.0                     # produces dist/finparty_1.0.0.0.zip + checksum
 ```
 
+## Verifying a real install
+
+The parts that matter most can't be unit tested: whether reflection binds to *your* build,
+whether your clients honour a server-initiated group join, and whether the tolerances actually
+move once real round-trip times come in. `tools/livetest.py` drives all of it over the API.
+
+```bash
+# read-only: health report, tuning binding, visible devices
+./tools/livetest.py --server http://jellyfin:8096 -u admin -p ... --stage verify
+
+# install (or upgrade) from the repository, restart, confirm it loaded
+./tools/livetest.py --server http://jellyfin:8096 -u admin -p ... --stage install
+
+# full party test on real devices — note the required --yes
+./tools/livetest.py --server http://jellyfin:8096 -u admin -p ... --stage party \
+    --devices <sessionId>,<sessionId> --item <itemId> --yes
+```
+
+`--stage verify` is safe to run any time; it only reads. Nothing that starts playback on
+somebody's television runs without `--yes`.
+
+The single most important line in its output is whether **latency tuning is ACTIVE** — if it
+isn't, the drift fix is not in effect and parties are running on stock tolerances.
+
 ---
 
 ## Troubleshooting
