@@ -33,6 +33,13 @@ namespace Jellyfin.Plugin.FinParty.Api;
 public class FinPartyController : ControllerBase
 {
     private const string UserIdClaim = "Jellyfin-UserId";
+    private const string IsApiKeyClaim = "Jellyfin-IsApiKey";
+
+    private const string ApiKeyMessage =
+        "FinParty needs a user token, not an API key. An API key authenticates the server itself " +
+        "and carries no user identity, so there is nobody to own the party or check device " +
+        "permissions against. Sign in with a normal account instead " +
+        "(POST /Users/AuthenticateByName) and use the returned AccessToken.";
 
     private readonly PartyManager _parties;
     private readonly NetworkDoctor _doctor;
@@ -119,7 +126,7 @@ public class FinPartyController : ControllerBase
         var user = GetCaller();
         if (user is null)
         {
-            return Unauthorized();
+            return NoCaller();
         }
 
         try
@@ -184,7 +191,7 @@ public class FinPartyController : ControllerBase
     {
         if (GetCaller() is null)
         {
-            return Unauthorized();
+            return NoCaller();
         }
 
         await _parties.EnsureSyncPlayAccessForSessionsAsync(request.SessionIds).ConfigureAwait(false);
@@ -389,12 +396,31 @@ public class FinPartyController : ControllerBase
         return Guid.TryParse(raw, out var userId) ? _userManager.GetUserById(userId) : null;
     }
 
+    /// <summary>
+    /// Determines whether the request was authenticated with an API key rather than a user token.
+    /// </summary>
+    /// <returns><c>true</c> when the caller is an API key.</returns>
+    private bool IsApiKeyRequest()
+        => string.Equals(
+            (HttpContext.User.Identity as ClaimsIdentity)?.FindFirst(IsApiKeyClaim)?.Value,
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Produces the correct failure for a request with no usable user identity.
+    /// </summary>
+    /// <returns>The error result.</returns>
+    private ActionResult NoCaller()
+        => IsApiKeyRequest()
+            ? BadRequest(new { error = ApiKeyMessage })
+            : Unauthorized();
+
     private ActionResult Execute<T>(Func<User, T> action)
     {
         var user = GetCaller();
         if (user is null)
         {
-            return Unauthorized();
+            return NoCaller();
         }
 
         try
