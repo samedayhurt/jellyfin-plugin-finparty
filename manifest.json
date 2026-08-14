@@ -1,0 +1,21 @@
+[
+    {
+        "guid": "d5aefefe-1dac-4925-859f-70f70972a0d9",
+        "name": "FinParty",
+        "description": "Watch parties that survive Tailscale, WireGuard and other high-latency links, with a phone remote any family member can use. Retunes SyncPlay's LAN-sized timing tolerances from measured round-trip time and jitter, stops one stalled device freezing everyone, and assembles groups server-side so unmodified native clients just join.",
+        "overview": "SyncPlay that works over a VPN, plus a one-tap party remote.",
+        "owner": "samedayhurt",
+        "category": "General",
+        "imageUrl": "",
+        "versions": [
+            {
+                "version": "1.0.0.0",
+                "changelog": "First release.\n\n- Adaptive per-group SyncPlay tuning driven by measured RTT and jitter\n- Stall breaker so one stuck device cannot freeze the party\n- Phone party remote at /FinParty, works with unmodified native clients\n- Network doctor: per-device latency, jitter, path classification and MTU checks\n- Automatic SyncPlay access granting",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/samedayhurt/jellyfin-plugin-finparty/releases/download/v1.0.0/finparty_1.0.0.0.zip",
+                "checksum": "60cf9c8c246a2cb0f3b1cf419288b9bb",
+                "timestamp": "2026-08-14T04:03:45Z"
+            }
+        ]
+    }
+]

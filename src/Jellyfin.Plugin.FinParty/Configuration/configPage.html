@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FinParty</title>
+</head>
+<body>
+<div id="FinPartyConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+  <div data-role="content">
+    <div class="content-primary">
+
+      <form id="FinPartyConfigForm">
+
+        <div class="verticalSection">
+          <h2 class="sectionTitle">FinParty</h2>
+          <p class="fieldDescription">
+            Watch parties that survive Tailscale, WireGuard and other high-latency links.
+            The family-facing remote lives at
+            <a is="emby-linkbutton" class="button-link" id="remoteLink" href="../../FinParty" target="_blank">/FinParty</a> —
+            send that link to anyone who should be able to start a party.
+          </p>
+          <div class="fieldDescription" id="tuningHealth" style="margin-top:1em;"></div>
+        </div>
+
+        <div class="verticalSection">
+          <h2 class="sectionTitle">Latency tuning</h2>
+
+          <div class="selectContainer">
+            <label class="selectLabel" for="Tuning">Tuning mode</label>
+            <select is="emby-select" id="Tuning" name="Tuning" class="emby-select">
+              <option value="0">Off — use Jellyfin's stock tolerances</option>
+              <option value="1">Fixed — always apply the values below</option>
+              <option value="2">Adaptive — size tolerances from measured latency</option>
+            </select>
+            <div class="fieldDescription">
+              Jellyfin hard-codes a 500 ms playback tolerance. Over a relayed VPN link that is
+              violated constantly, which is what causes the endless re-seeking. Adaptive measures
+              each party's real round-trip time and widens the tolerance only as much as needed.
+            </div>
+          </div>
+
+          <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="MaxPlaybackOffsetMs">
+              Minimum playback tolerance (ms)</label>
+            <input is="emby-input" type="number" id="MaxPlaybackOffsetMs" name="MaxPlaybackOffsetMs"
+                   min="100" max="10000" step="50" class="emby-input" />
+            <div class="fieldDescription">
+              How far a client may drift before the server drags it back. Jellyfin's value is 500.
+            </div>
+          </div>
+
+          <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="TimeSyncOffsetMs">
+              Minimum clock tolerance (ms)</label>
+            <input is="emby-input" type="number" id="TimeSyncOffsetMs" name="TimeSyncOffsetMs"
+                   min="500" max="30000" step="100" class="emby-input" />
+            <div class="fieldDescription">
+              Beyond this skew the server discards the client's own timestamp, which makes every
+              correction worse. Jellyfin's value is 2000.
+            </div>
+          </div>
+
+          <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="DefaultPingMs">
+              Assumed ping before measurement (ms)</label>
+            <input is="emby-input" type="number" id="DefaultPingMs" name="DefaultPingMs"
+                   min="50" max="5000" step="50" class="emby-input" />
+          </div>
+
+          <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="AdaptiveCeilingMs">
+              Adaptive ceiling (ms)</label>
+            <input is="emby-input" type="number" id="AdaptiveCeilingMs" name="AdaptiveCeilingMs"
+                   min="500" max="20000" step="100" class="emby-input" />
+            <div class="fieldDescription">
+              Stops one pathological connection from making the whole party sloppy.
+            </div>
+          </div>
+
+          <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="AdaptiveRttMultiplier">
+              Adaptive round-trip multiplier</label>
+            <input is="emby-input" type="number" id="AdaptiveRttMultiplier" name="AdaptiveRttMultiplier"
+                   min="1" max="10" step="0.5" class="emby-input" />
+          </div>
+        </div>
+
+        <div class="verticalSection">
+          <h2 class="sectionTitle">Keeping the party moving</h2>
+
+          <label class="checkboxContainer">
+            <input is="emby-checkbox" type="checkbox" id="EnableStallBreaker" name="EnableStallBreaker" />
+            <span>Don't let one stuck device freeze everyone</span>
+          </label>
+          <div class="fieldDescription">
+            If someone's stream stalls, the rest of the party carries on and that person rejoins
+            automatically once they catch up. Uses SyncPlay's own "stop waiting for me" request.
+          </div>
+
+          <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="StallBreakerSeconds">
+              Wait this long first (seconds)</label>
+            <input is="emby-input" type="number" id="StallBreakerSeconds" name="StallBreakerSeconds"
+                   min="5" max="300" step="5" class="emby-input" />
+          </div>
+        </div>
+
+        <div class="verticalSection">
+          <h2 class="sectionTitle">Access</h2>
+
+          <label class="checkboxContainer">
+            <input is="emby-checkbox" type="checkbox" id="AutoGrantSyncPlayAccess" name="AutoGrantSyncPlayAccess" />
+            <span>Grant SyncPlay access automatically</span>
+          </label>
+          <div class="fieldDescription">
+            Saves talking a family member through a settings page they will never open again.
+          </div>
+
+          <label class="checkboxContainer">
+            <input is="emby-checkbox" type="checkbox" id="AllowGuestsToInviteDevices" name="AllowGuestsToInviteDevices" />
+            <span>Let non-administrators add other people's devices</span>
+          </label>
+          <div class="fieldDescription">
+            Still requires Jellyfin's own "remote control other users" permission. Turn this off
+            to restrict pulling other people's TVs into a party to administrators only.
+          </div>
+
+          <div class="inputContainer">
+            <label class="inputLabel inputLabelUnfocused" for="PartyCodeLifetimeMinutes">
+              Party code lifetime (minutes)</label>
+            <input is="emby-input" type="number" id="PartyCodeLifetimeMinutes" name="PartyCodeLifetimeMinutes"
+                   min="5" max="1440" step="5" class="emby-input" />
+          </div>
+        </div>
+
+        <div>
+          <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+            <span>Save</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <script type="text/javascript">
+    (function () {
+      var pluginId = 'd5aefefe-1dac-4925-859f-70f70972a0d9';
+
+      var fields = [
+        ['Tuning', 'number'],
+        ['DefaultPingMs', 'number'],
+        ['TimeSyncOffsetMs', 'number'],
+        ['MaxPlaybackOffsetMs', 'number'],
+        ['AdaptiveCeilingMs', 'number'],
+        ['AdaptiveRttMultiplier', 'number'],
+        ['EnableStallBreaker', 'bool'],
+        ['StallBreakerSeconds', 'number'],
+        ['AutoGrantSyncPlayAccess', 'bool'],
+        ['AllowGuestsToInviteDevices', 'bool'],
+        ['PartyCodeLifetimeMinutes', 'number']
+      ];
+
+      function view() {
+        return document.querySelector('#FinPartyConfigPage');
+      }
+
+      function load() {
+        Dashboard.showLoadingMsg();
+
+        ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+          fields.forEach(function (field) {
+            var el = view().querySelector('#' + field[0]);
+            if (!el) return;
+
+            if (field[1] === 'bool') {
+              el.checked = !!config[field[0]];
+            } else {
+              el.value = config[field[0]];
+            }
+          });
+
+          Dashboard.hideLoadingMsg();
+        });
+
+        ApiClient.ajax({
+          type: 'GET',
+          url: ApiClient.getUrl('FinParty/api/health'),
+          dataType: 'json'
+        }).then(function (report) {
+          var el = view().querySelector('#tuningHealth');
+          el.textContent = report.tuningActive
+            ? '✅ Bound to Jellyfin\'s SyncPlay internals — latency tuning is active.'
+            : '⚠️ Latency tuning is not active (' + report.syncPlayInternals + '). ' +
+              'Parties still work, but with Jellyfin\'s fixed 500 ms tolerance.';
+        }).catch(function () {
+          // The health endpoint is a nicety; never block the config page on it.
+        });
+      }
+
+      function save(e) {
+        e.preventDefault();
+        Dashboard.showLoadingMsg();
+
+        ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+          fields.forEach(function (field) {
+            var el = view().querySelector('#' + field[0]);
+            if (!el) return;
+
+            if (field[1] === 'bool') {
+              config[field[0]] = el.checked;
+            } else {
+              config[field[0]] = Number(el.value);
+            }
+          });
+
+          ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+            Dashboard.processPluginConfigurationUpdateResult(result);
+          });
+        });
+
+        return false;
+      }
+
+      view().addEventListener('viewshow', load);
+      view().querySelector('#FinPartyConfigForm').addEventListener('submit', save);
+
+      if (document.readyState !== 'loading') {
+        load();
+      }
+    })();
+  </script>
+</div>
+</body>
+</html>
