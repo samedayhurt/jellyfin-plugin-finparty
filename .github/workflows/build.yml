@@ -62,3 +62,53 @@ jobs:
         with:
           files: dist/finparty_${{ steps.version.outputs.version }}.zip
           generate_release_notes: true
+
+      # The checksum must describe the artifact that was actually published, not a
+      # local build. Jellyfin refuses any download whose MD5 does not match, so the
+      # manifest is regenerated here from the real zip rather than maintained by hand.
+      - name: Update plugin manifest
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          ZIP="dist/finparty_${VERSION}.zip"
+          CHECKSUM="$(md5sum "$ZIP" | cut -d' ' -f1)"
+          TIMESTAMP="$(unzip -p "$ZIP" meta.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["timestamp"])')"
+          URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/finparty_${VERSION}.zip"
+
+          # Move onto main before editing: the tag build starts in detached HEAD.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+
+          python3 - "$VERSION" "$CHECKSUM" "$TIMESTAMP" "$URL" <<'PY'
+          import json, sys
+          version, checksum, timestamp, url = sys.argv[1:5]
+
+          with open('manifest.json') as handle:
+              manifest = json.load(handle)
+
+          versions = manifest[0]['versions']
+          entry = next((v for v in versions if v['version'] == version), None)
+
+          if entry is None:
+              entry = {'version': version, 'changelog': '', 'targetAbi': '10.11.0.0'}
+              versions.insert(0, entry)
+
+          entry.update(checksum=checksum, timestamp=timestamp, sourceUrl=url)
+
+          with open('manifest.json', 'w') as handle:
+              json.dump(manifest, handle, indent=4)
+              handle.write('\n')
+          PY
+
+          if git diff --quiet -- manifest.json; then
+            echo "manifest already correct"
+            exit 0
+          fi
+
+          git add manifest.json
+          git commit -m "chore: sync manifest checksum for ${TAG}"
+          git push origin main

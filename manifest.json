@@ -13,8 +13,8 @@
                 "changelog": "First release.\n\n- Adaptive per-group SyncPlay tuning driven by measured RTT and jitter\n- Stall breaker so one stuck device cannot freeze the party\n- Phone party remote at /FinParty, works with unmodified native clients\n- Network doctor: per-device latency, jitter, path classification and MTU checks\n- Automatic SyncPlay access granting",
                 "targetAbi": "10.11.0.0",
                 "sourceUrl": "https://github.com/samedayhurt/jellyfin-plugin-finparty/releases/download/v1.0.0/finparty_1.0.0.0.zip",
-                "checksum": "60cf9c8c246a2cb0f3b1cf419288b9bb",
-                "timestamp": "2026-08-14T04:03:45Z"
+                "checksum": "d8a61068d6e373ba52f43191d50df361",
+                "timestamp": "2026-08-14T04:05:57Z"
             }
         ]
     }
