@@ -79,6 +79,47 @@ public class SwaggerSchemaCollisionTests
     }
 
     /// <summary>
+    /// Jellyfin sets the OpenAPI operationId to the bare action method name
+    /// (<c>ApiServiceCollectionExtensions</c>: "Use method name as operationId"), and that name
+    /// is shared with every controller in the process — Jellyfin's own and every other plugin's.
+    /// A method called <c>GetDevices</c> would silently duplicate Jellyfin's
+    /// <c>DevicesController.GetDevices</c>, producing an ambiguous document and broken generated
+    /// clients. Keeping the plugin name in every action makes that impossible.
+    /// </summary>
+    [Fact]
+    public void EveryActionNameIsNamespacedToThePlugin()
+    {
+        var actions = typeof(Plugin).Assembly.GetTypes()
+            .Where(type => typeof(ControllerBase).IsAssignableFrom(type) && !type.IsAbstract)
+            .SelectMany(type => type.GetMethods(
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            .Where(method => method.GetCustomAttributes<HttpMethodAttribute>().Any())
+            .ToList();
+
+        Assert.NotEmpty(actions);
+
+        var generic = actions
+            .Select(method => method.Name)
+            .Where(name => !name.Contains("FinParty", StringComparison.Ordinal))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            generic.Count == 0,
+            "Jellyfin uses the action method name as the OpenAPI operationId, which is global "
+            + "across every controller in the process. These names are too generic and will "
+            + "collide:\n  " + string.Join("\n  ", generic));
+
+        var duplicates = actions
+            .GroupBy(method => method.Name, StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToList();
+
+        Assert.True(duplicates.Count == 0, "Duplicate action names: " + string.Join(", ", duplicates));
+    }
+
+    /// <summary>
     /// Collects every type Swashbuckle would need a schema for: the parameters and return
     /// types of each action, plus anything reachable through their properties.
     /// </summary>

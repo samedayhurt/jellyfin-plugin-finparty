@@ -77,7 +77,7 @@ public class FinPartyController : ControllerBase
     [HttpGet("index.html")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Text.Html)]
-    public ActionResult GetRemote()
+    public ActionResult GetFinPartyRemote()
     {
         var assembly = Assembly.GetExecutingAssembly();
         var resource = $"{typeof(Plugin).Namespace}.Web.party.html";
@@ -99,7 +99,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The controllable devices.</returns>
     [HttpGet("api/devices")]
     [Authorize]
-    public ActionResult<IReadOnlyList<FinPartyDeviceDto>> GetDevices()
+    public ActionResult<IReadOnlyList<FinPartyDeviceDto>> GetFinPartyDevices()
         => Execute(user => _parties.GetDevices(user));
 
     /// <summary>
@@ -108,7 +108,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The live parties.</returns>
     [HttpGet("api/parties")]
     [Authorize]
-    public ActionResult<IReadOnlyList<FinPartyStateDto>> GetParties()
+    public ActionResult<IReadOnlyList<FinPartyStateDto>> GetFinPartyParties()
         => Execute(_ => _parties.GetParties());
 
     /// <summary>
@@ -119,7 +119,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The new party and the outcome of each invitation.</returns>
     [HttpPost("api/parties")]
     [Authorize]
-    public async Task<ActionResult> CreateParty(
+    public async Task<ActionResult> CreateFinParty(
         [FromBody] FinPartyCreateRequest request,
         CancellationToken cancellationToken)
     {
@@ -153,7 +153,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The party state.</returns>
     [HttpGet("api/parties/{groupId}")]
     [Authorize]
-    public ActionResult GetParty([FromRoute] Guid groupId)
+    public ActionResult GetFinPartyState([FromRoute] Guid groupId)
         => Execute(user => _parties.GetState(user, groupId));
 
     /// <summary>
@@ -163,7 +163,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The party state.</returns>
     [HttpGet("api/code/{code}")]
     [Authorize]
-    public ActionResult ResolveCode([FromRoute] string code)
+    public ActionResult ResolveFinPartyCode([FromRoute] string code)
     {
         var groupId = _parties.ResolveCode(code);
 
@@ -184,7 +184,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The outcome of each invitation.</returns>
     [HttpPost("api/parties/{groupId}/invite")]
     [Authorize]
-    public async Task<ActionResult> Invite(
+    public async Task<ActionResult> InviteToFinParty(
         [FromRoute] Guid groupId,
         [FromBody] FinPartyInviteRequest request,
         CancellationToken cancellationToken)
@@ -207,7 +207,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The updated party state.</returns>
     [HttpDelete("api/parties/{groupId}/members/{sessionId}")]
     [Authorize]
-    public ActionResult RemoveMember(
+    public ActionResult RemoveFromFinParty(
         [FromRoute] Guid groupId,
         [FromRoute] string sessionId,
         CancellationToken cancellationToken)
@@ -226,7 +226,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The updated party state.</returns>
     [HttpPost("api/parties/{groupId}/play")]
     [Authorize]
-    public ActionResult Play(
+    public ActionResult PlayInFinParty(
         [FromRoute] Guid groupId,
         [FromBody] FinPartyPlayRequest request,
         CancellationToken cancellationToken)
@@ -244,7 +244,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The updated party state.</returns>
     [HttpPost("api/parties/{groupId}/pause")]
     [Authorize]
-    public ActionResult Pause([FromRoute] Guid groupId, CancellationToken cancellationToken)
+    public ActionResult PauseFinParty([FromRoute] Guid groupId, CancellationToken cancellationToken)
         => Execute(user =>
         {
             _parties.Command(user, groupId, new PauseGroupRequest(), cancellationToken);
@@ -259,7 +259,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The updated party state.</returns>
     [HttpPost("api/parties/{groupId}/resume")]
     [Authorize]
-    public ActionResult Resume([FromRoute] Guid groupId, CancellationToken cancellationToken)
+    public ActionResult ResumeFinParty([FromRoute] Guid groupId, CancellationToken cancellationToken)
         => Execute(user =>
         {
             _parties.Command(user, groupId, new UnpauseGroupRequest(), cancellationToken);
@@ -275,7 +275,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The updated party state.</returns>
     [HttpPost("api/parties/{groupId}/seek")]
     [Authorize]
-    public ActionResult Seek(
+    public ActionResult SeekFinParty(
         [FromRoute] Guid groupId,
         [FromBody] FinPartySeekRequest request,
         CancellationToken cancellationToken)
@@ -294,7 +294,7 @@ public class FinPartyController : ControllerBase
     /// <returns>No content.</returns>
     [HttpPost("api/parties/{groupId}/end")]
     [Authorize]
-    public ActionResult End([FromRoute] Guid groupId, CancellationToken cancellationToken)
+    public ActionResult EndFinParty([FromRoute] Guid groupId, CancellationToken cancellationToken)
         => Execute(user =>
         {
             _parties.Command(user, groupId, new StopGroupRequest(), cancellationToken);
@@ -320,7 +320,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The diagnostic report.</returns>
     [HttpGet("api/health")]
     [Authorize]
-    public ActionResult GetHealth()
+    public ActionResult GetFinPartyHealth()
         => Execute(user => _doctor.Diagnose(user));
 
     /// <summary>
@@ -331,7 +331,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The matching items.</returns>
     [HttpGet("api/library")]
     [Authorize]
-    public ActionResult GetLibrary([FromQuery] string? q, [FromQuery] int limit = 40)
+    public ActionResult GetFinPartyLibrary([FromQuery] string? q, [FromQuery] int limit = 40)
         => Execute(user => Browse(user, q, Math.Clamp(limit, 1, 100)));
 
     private IReadOnlyList<object> Browse(User user, string? searchTerm, int limit)
