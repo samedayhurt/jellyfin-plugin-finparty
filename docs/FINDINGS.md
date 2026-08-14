@@ -197,6 +197,39 @@ Findings 4 and 5 use **entirely public API** and are unaffected by version chang
 
 ---
 
+## Finding 6: a plugin DTO can stop Jellyfin from booting
+
+Not a Jellyfin bug, but a trap sharp enough to be worth writing down: **FinParty 1.0.0 took a
+live server down with it**, and the mechanism generalises to any plugin.
+
+Jellyfin builds an OpenAPI document during startup. Swashbuckle derives each `schemaId` from a
+type's **short name**, so a plugin DTO called `PlayRequest` collides with Jellyfin's own
+[`MediaBrowser.Model.Session.PlayRequest`](https://github.com/jellyfin/jellyfin/blob/v10.11.11/MediaBrowser.Model/Session/PlayRequest.cs).
+Schema generation throws, and because it happens while the host is starting, **Jellyfin never
+binds its port**. The server does not start with the plugin disabled — it does not start at all.
+The only evidence is a stack trace in the log.
+
+What makes it dangerous is how invisible it is beforehand. The plugin compiles, loads as an
+assembly, and passes every unit test. The collision only exists once a real Jellyfin enumerates
+every controller in the process — which also means **another plugin's DTO can collide with
+yours**, so a name that is unique against Jellyfin today can still break on a server with a
+different plugin set.
+
+Mitigations, in order of usefulness:
+
+1. **Prefix every type reachable from a controller signature.** FinParty uses `FinParty*`
+   (`FinPartyPlayRequest`, `FinPartyStateDto`, …). Internal types are unaffected — only what
+   Swagger schematises matters.
+2. **Test for it.** `SwaggerSchemaCollisionTests` walks the parameters and return types of every
+   action, follows their properties, and fails if any short name matches a type in
+   `MediaBrowser.Model` or `MediaBrowser.Controller`. It reproduces the collision at build time
+   rather than at somebody's dinner time.
+3. **Never restart a shared server to load an untested plugin build** without a rollback path
+   that does not depend on that server being up. Removing a bad plugin needs filesystem access,
+   which the Jellyfin API cannot give you once Jellyfin is the thing that is down.
+
+---
+
 ## Reproducing the measurements
 
 The `GET /FinParty/api/health` endpoint reports, per session, the median RTT, the mean absolute

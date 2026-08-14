@@ -6,7 +6,7 @@ namespace Jellyfin.Plugin.FinParty.Models;
 /// <summary>
 /// A device that the caller is allowed to pull into a party.
 /// </summary>
-public class DeviceDto
+public class FinPartyDeviceDto
 {
     /// <summary>Gets or sets the Jellyfin session identifier.</summary>
     public string SessionId { get; set; } = string.Empty;
@@ -51,7 +51,7 @@ public class DeviceDto
 /// <summary>
 /// A member of a live party.
 /// </summary>
-public class PartyMemberDto
+public class FinPartyMemberDto
 {
     /// <summary>Gets or sets the session identifier.</summary>
     public string SessionId { get; set; } = string.Empty;
@@ -78,7 +78,7 @@ public class PartyMemberDto
 /// <summary>
 /// The current state of a party.
 /// </summary>
-public class PartyStateDto
+public class FinPartyStateDto
 {
     /// <summary>Gets or sets the SyncPlay group identifier.</summary>
     public Guid GroupId { get; set; }
@@ -105,19 +105,19 @@ public class PartyStateDto
     public double RuntimeSeconds { get; set; }
 
     /// <summary>Gets or sets the members of the party.</summary>
-    public IReadOnlyList<PartyMemberDto> Members { get; set; } = Array.Empty<PartyMemberDto>();
+    public IReadOnlyList<FinPartyMemberDto> Members { get; set; } = Array.Empty<FinPartyMemberDto>();
 
     /// <summary>Gets or sets a value indicating whether anyone is currently buffering.</summary>
     public bool AnyoneBuffering { get; set; }
 
     /// <summary>Gets or sets the tolerances FinParty applied to this party.</summary>
-    public TuningDto? Tuning { get; set; }
+    public FinPartyTuningDto? Tuning { get; set; }
 }
 
 /// <summary>
 /// The latency tolerances applied to a party.
 /// </summary>
-public class TuningDto
+public class FinPartyTuningDto
 {
     /// <summary>Gets or sets the tuning mode in force.</summary>
     public string Mode { get; set; } = "Off";
@@ -141,7 +141,7 @@ public class TuningDto
 /// <summary>
 /// The outcome of inviting devices into a party.
 /// </summary>
-public class InviteResultDto
+public class FinPartyInviteResultDto
 {
     /// <summary>Gets or sets the sessions that joined.</summary>
     public IList<string> Joined { get; set; } = new List<string>();
@@ -153,7 +153,7 @@ public class InviteResultDto
 /// <summary>
 /// A request to start a new party.
 /// </summary>
-public class CreatePartyRequest
+public class FinPartyCreateRequest
 {
     /// <summary>Gets or sets the party name shown to the family.</summary>
     public string? Name { get; set; }
@@ -168,7 +168,7 @@ public class CreatePartyRequest
 /// <summary>
 /// A request to add devices to an existing party.
 /// </summary>
-public class InviteRequest
+public class FinPartyInviteRequest
 {
     /// <summary>Gets or sets the sessions to pull into the party.</summary>
     public IReadOnlyList<string> SessionIds { get; set; } = Array.Empty<string>();
@@ -177,7 +177,7 @@ public class InviteRequest
 /// <summary>
 /// A request to start playback in a party.
 /// </summary>
-public class PlayRequest
+public class FinPartyPlayRequest
 {
     /// <summary>Gets or sets the item to play.</summary>
     public Guid ItemId { get; set; }
@@ -189,7 +189,7 @@ public class PlayRequest
 /// <summary>
 /// A request to seek the party.
 /// </summary>
-public class SeekRequest
+public class FinPartySeekRequest
 {
     /// <summary>Gets or sets the target position in seconds.</summary>
     public double PositionSeconds { get; set; }

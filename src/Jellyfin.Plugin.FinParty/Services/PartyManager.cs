@@ -102,11 +102,11 @@ public sealed class PartyManager
     /// </summary>
     /// <param name="caller">The calling user.</param>
     /// <returns>The controllable devices.</returns>
-    public IReadOnlyList<DeviceDto> GetDevices(User caller)
+    public IReadOnlyList<FinPartyDeviceDto> GetDevices(User caller)
     {
         Prune();
 
-        var devices = new List<DeviceDto>();
+        var devices = new List<FinPartyDeviceDto>();
         var now = DateTime.UtcNow;
 
         foreach (var session in _sessionManager.Sessions)
@@ -138,7 +138,7 @@ public sealed class PartyManager
             var stats = _latency.Get(session.Id);
             var membership = FindMembership(session.Id);
 
-            devices.Add(new DeviceDto
+            devices.Add(new FinPartyDeviceDto
             {
                 SessionId = session.Id,
                 DeviceName = string.IsNullOrWhiteSpace(session.DeviceName) ? "Unknown device" : session.DeviceName,
@@ -172,9 +172,9 @@ public sealed class PartyManager
     /// <returns>The party state and the outcome of each invitation.</returns>
     /// <exception cref="PartyForbiddenException">The caller may not control one of the devices.</exception>
     /// <exception cref="InvalidOperationException">No usable device was supplied.</exception>
-    public (PartyStateDto State, InviteResultDto Invites) CreateParty(
+    public (FinPartyStateDto State, FinPartyInviteResultDto Invites) CreateParty(
         User caller,
-        CreatePartyRequest request,
+        FinPartyCreateRequest request,
         CancellationToken cancellationToken)
     {
         var targets = ResolveSessions(caller, request.SessionIds);
@@ -202,7 +202,7 @@ public sealed class PartyManager
             name,
             host.DeviceName);
 
-        var invites = new InviteResultDto();
+        var invites = new FinPartyInviteResultDto();
         invites.Joined.Add(host.Id);
 
         foreach (var session in targets.Skip(1))
@@ -212,7 +212,7 @@ public sealed class PartyManager
 
         if (request.ItemId.HasValue && request.ItemId.Value != Guid.Empty)
         {
-            Play(caller, record.GroupId, new Models.PlayRequest { ItemId = request.ItemId.Value }, cancellationToken);
+            Play(caller, record.GroupId, new FinPartyPlayRequest { ItemId = request.ItemId.Value }, cancellationToken);
         }
 
         return (BuildState(record), invites);
@@ -226,7 +226,7 @@ public sealed class PartyManager
     /// <param name="sessionIds">The sessions to add.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The outcome of each invitation.</returns>
-    public InviteResultDto Invite(
+    public FinPartyInviteResultDto Invite(
         User caller,
         Guid groupId,
         IReadOnlyList<string> sessionIds,
@@ -234,7 +234,7 @@ public sealed class PartyManager
     {
         var record = RequireParty(groupId);
         var targets = ResolveSessions(caller, sessionIds);
-        var result = new InviteResultDto();
+        var result = new FinPartyInviteResultDto();
 
         foreach (var session in targets)
         {
@@ -270,7 +270,7 @@ public sealed class PartyManager
     /// <param name="groupId">The party group identifier.</param>
     /// <param name="request">The play request.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    public void Play(User caller, Guid groupId, Models.PlayRequest request, CancellationToken cancellationToken)
+    public void Play(User caller, Guid groupId, FinPartyPlayRequest request, CancellationToken cancellationToken)
     {
         var record = RequireParty(groupId);
         var actor = RequireActor(caller, record);
@@ -313,7 +313,7 @@ public sealed class PartyManager
     /// <param name="caller">The calling user.</param>
     /// <param name="groupId">The party group identifier.</param>
     /// <returns>The party state.</returns>
-    public PartyStateDto GetState(User caller, Guid groupId)
+    public FinPartyStateDto GetState(User caller, Guid groupId)
     {
         var record = RequireParty(groupId);
         return BuildState(record);
@@ -340,7 +340,7 @@ public sealed class PartyManager
     /// Lists the parties currently running.
     /// </summary>
     /// <returns>The live parties.</returns>
-    public IReadOnlyList<PartyStateDto> GetParties()
+    public IReadOnlyList<FinPartyStateDto> GetParties()
     {
         Prune();
         return _byGroup.Values.Select(BuildState).ToList();
@@ -465,7 +465,7 @@ public sealed class PartyManager
     private void JoinSession(
         PartyRecord record,
         SessionInfo session,
-        InviteResultDto result,
+        FinPartyInviteResultDto result,
         CancellationToken cancellationToken)
     {
         try
@@ -566,9 +566,9 @@ public sealed class PartyManager
     private PartyRecord? FindMembership(string sessionId)
         => _byGroup.Values.FirstOrDefault(r => r.Roster.ContainsKey(sessionId));
 
-    private PartyStateDto BuildState(PartyRecord record)
+    private FinPartyStateDto BuildState(PartyRecord record)
     {
-        var state = new PartyStateDto
+        var state = new FinPartyStateDto
         {
             GroupId = record.GroupId,
             Code = record.Code,
@@ -576,7 +576,7 @@ public sealed class PartyManager
         };
 
         var group = _reflector.GetGroup(record.GroupId);
-        var members = new List<PartyMemberDto>();
+        var members = new List<FinPartyMemberDto>();
 
         if (group is not null)
         {
@@ -612,7 +612,7 @@ public sealed class PartyManager
                 var stats = _latency.Get(member.SessionId);
                 var session = FindSession(member.SessionId);
 
-                members.Add(new PartyMemberDto
+                members.Add(new FinPartyMemberDto
                 {
                     SessionId = member.SessionId,
                     UserName = member.UserName ?? string.Empty,
@@ -638,7 +638,7 @@ public sealed class PartyManager
                 }
 
                 var stats = _latency.Get(sessionId);
-                members.Add(new PartyMemberDto
+                members.Add(new FinPartyMemberDto
                 {
                     SessionId = sessionId,
                     UserName = session.UserName ?? string.Empty,
@@ -656,7 +656,7 @@ public sealed class PartyManager
         if (snapshot.HasValue)
         {
             var value = snapshot.Value;
-            state.Tuning = new TuningDto
+            state.Tuning = new FinPartyTuningDto
             {
                 Mode = value.Mode,
                 MaxPlaybackOffsetMs = value.MaxPlaybackOffsetMs,

@@ -99,7 +99,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The controllable devices.</returns>
     [HttpGet("api/devices")]
     [Authorize]
-    public ActionResult<IReadOnlyList<DeviceDto>> GetDevices()
+    public ActionResult<IReadOnlyList<FinPartyDeviceDto>> GetDevices()
         => Execute(user => _parties.GetDevices(user));
 
     /// <summary>
@@ -108,7 +108,7 @@ public class FinPartyController : ControllerBase
     /// <returns>The live parties.</returns>
     [HttpGet("api/parties")]
     [Authorize]
-    public ActionResult<IReadOnlyList<PartyStateDto>> GetParties()
+    public ActionResult<IReadOnlyList<FinPartyStateDto>> GetParties()
         => Execute(_ => _parties.GetParties());
 
     /// <summary>
@@ -120,7 +120,7 @@ public class FinPartyController : ControllerBase
     [HttpPost("api/parties")]
     [Authorize]
     public async Task<ActionResult> CreateParty(
-        [FromBody] CreatePartyRequest request,
+        [FromBody] FinPartyCreateRequest request,
         CancellationToken cancellationToken)
     {
         var user = GetCaller();
@@ -186,7 +186,7 @@ public class FinPartyController : ControllerBase
     [Authorize]
     public async Task<ActionResult> Invite(
         [FromRoute] Guid groupId,
-        [FromBody] InviteRequest request,
+        [FromBody] FinPartyInviteRequest request,
         CancellationToken cancellationToken)
     {
         if (GetCaller() is null)
@@ -228,7 +228,7 @@ public class FinPartyController : ControllerBase
     [Authorize]
     public ActionResult Play(
         [FromRoute] Guid groupId,
-        [FromBody] Models.PlayRequest request,
+        [FromBody] FinPartyPlayRequest request,
         CancellationToken cancellationToken)
         => Execute(user =>
         {
@@ -277,7 +277,7 @@ public class FinPartyController : ControllerBase
     [Authorize]
     public ActionResult Seek(
         [FromRoute] Guid groupId,
-        [FromBody] Models.SeekRequest request,
+        [FromBody] FinPartySeekRequest request,
         CancellationToken cancellationToken)
         => Execute(user =>
         {
