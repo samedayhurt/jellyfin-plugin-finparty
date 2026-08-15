@@ -14,10 +14,10 @@
         <div class="verticalSection">
           <h2 class="sectionTitle">FinParty</h2>
           <p class="fieldDescription">
-            Watch parties that survive Tailscale, WireGuard and other high-latency links.
-            The family-facing remote lives at
-            <a is="emby-linkbutton" class="button-link" id="remoteLink" href="../../FinParty" target="_blank">/FinParty</a> —
-            send that link to anyone who should be able to start a party.
+            Keeps Jellyfin SyncPlay from stalling over Tailscale, WireGuard and other high-latency
+            links. It runs by itself — there is nothing to start. Whenever a SyncPlay group is
+            active, FinParty measures the round-trip time to each member and widens Jellyfin's
+            timing tolerances to match, and it stops one buffering device from freezing the group.
           </p>
           <div class="fieldDescription" id="tuningHealth" style="margin-top:1em;"></div>
         </div>
@@ -34,8 +34,9 @@
             </select>
             <div class="fieldDescription">
               Jellyfin hard-codes a 500 ms playback tolerance. Over a relayed VPN link that is
-              violated constantly, which is what causes the endless re-seeking. Adaptive measures
-              each party's real round-trip time and widens the tolerance only as much as needed.
+              violated constantly, which is what causes the endless re-seeking and stalls.
+              Adaptive measures each group's real round-trip time and widens the tolerance only as
+              much as needed.
             </div>
           </div>
 
@@ -73,7 +74,7 @@
             <input is="emby-input" type="number" id="AdaptiveCeilingMs" name="AdaptiveCeilingMs"
                    min="500" max="20000" step="100" class="emby-input" />
             <div class="fieldDescription">
-              Stops one pathological connection from making the whole party sloppy.
+              Stops one pathological connection from making the whole group sloppy.
             </div>
           </div>
 
@@ -86,15 +87,15 @@
         </div>
 
         <div class="verticalSection">
-          <h2 class="sectionTitle">Keeping the party moving</h2>
+          <h2 class="sectionTitle">Keeping the group moving</h2>
 
           <label class="checkboxContainer">
             <input is="emby-checkbox" type="checkbox" id="EnableStallBreaker" name="EnableStallBreaker" />
             <span>Don't let one stuck device freeze everyone</span>
           </label>
           <div class="fieldDescription">
-            If someone's stream stalls, the rest of the party carries on and that person rejoins
-            automatically once they catch up. Uses SyncPlay's own "stop waiting for me" request.
+            If someone's stream stalls, the rest of the group carries on and that device rejoins
+            automatically once it catches up. Uses SyncPlay's own "stop waiting for me" request.
           </div>
 
           <div class="inputContainer">
@@ -102,34 +103,6 @@
               Wait this long first (seconds)</label>
             <input is="emby-input" type="number" id="StallBreakerSeconds" name="StallBreakerSeconds"
                    min="5" max="300" step="5" class="emby-input" />
-          </div>
-        </div>
-
-        <div class="verticalSection">
-          <h2 class="sectionTitle">Access</h2>
-
-          <label class="checkboxContainer">
-            <input is="emby-checkbox" type="checkbox" id="AutoGrantSyncPlayAccess" name="AutoGrantSyncPlayAccess" />
-            <span>Grant SyncPlay access automatically</span>
-          </label>
-          <div class="fieldDescription">
-            Saves talking a family member through a settings page they will never open again.
-          </div>
-
-          <label class="checkboxContainer">
-            <input is="emby-checkbox" type="checkbox" id="AllowGuestsToInviteDevices" name="AllowGuestsToInviteDevices" />
-            <span>Let non-administrators add other people's devices</span>
-          </label>
-          <div class="fieldDescription">
-            Still requires Jellyfin's own "remote control other users" permission. Turn this off
-            to restrict pulling other people's TVs into a party to administrators only.
-          </div>
-
-          <div class="inputContainer">
-            <label class="inputLabel inputLabelUnfocused" for="PartyCodeLifetimeMinutes">
-              Party code lifetime (minutes)</label>
-            <input is="emby-input" type="number" id="PartyCodeLifetimeMinutes" name="PartyCodeLifetimeMinutes"
-                   min="5" max="1440" step="5" class="emby-input" />
           </div>
         </div>
 
@@ -155,10 +128,7 @@
         ['AdaptiveCeilingMs', 'number'],
         ['AdaptiveRttMultiplier', 'number'],
         ['EnableStallBreaker', 'bool'],
-        ['StallBreakerSeconds', 'number'],
-        ['AutoGrantSyncPlayAccess', 'bool'],
-        ['AllowGuestsToInviteDevices', 'bool'],
-        ['PartyCodeLifetimeMinutes', 'number']
+        ['StallBreakerSeconds', 'number']
       ];
 
       function view() {
@@ -172,14 +142,12 @@
           fields.forEach(function (field) {
             var el = view().querySelector('#' + field[0]);
             if (!el) return;
-
             if (field[1] === 'bool') {
               el.checked = !!config[field[0]];
             } else {
               el.value = config[field[0]];
             }
           });
-
           Dashboard.hideLoadingMsg();
         });
 
@@ -190,9 +158,11 @@
         }).then(function (report) {
           var el = view().querySelector('#tuningHealth');
           el.textContent = report.tuningActive
-            ? '✅ Bound to Jellyfin\'s SyncPlay internals — latency tuning is active.'
-            : '⚠️ Latency tuning is not active (' + report.syncPlayInternals + '). ' +
-              'Parties still work, but with Jellyfin\'s fixed 500 ms tolerance.';
+            ? '✅ Attached to Jellyfin\'s SyncPlay — tuning a live group now.'
+            : (report.syncPlayInternals && report.syncPlayInternals.indexOf('unavailable') === 0
+                ? '⚠️ Could not attach to Jellyfin\'s SyncPlay internals (' + report.syncPlayInternals +
+                  '). Groups still work, but with Jellyfin\'s fixed 500 ms tolerance.'
+                : '✅ Attached to Jellyfin\'s SyncPlay — it tunes the moment a group starts playing.');
         }).catch(function () {
           // The health endpoint is a nicety; never block the config page on it.
         });
@@ -206,7 +176,6 @@
           fields.forEach(function (field) {
             var el = view().querySelector('#' + field[0]);
             if (!el) return;
-
             if (field[1] === 'bool') {
               config[field[0]] = el.checked;
             } else {

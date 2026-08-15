@@ -16,11 +16,10 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<SyncPlayReflector>();
         serviceCollection.AddSingleton<LatencyTracker>();
         serviceCollection.AddSingleton<PartyTuner>();
-        serviceCollection.AddSingleton<PartyManager>();
         serviceCollection.AddSingleton<NetworkDoctor>();
 
-        // The tuner is both a queryable service and a background loop, so resolve the
-        // same instance for both roles.
+        // The tuner is the whole plugin: a background loop that keeps every live SyncPlay group
+        // from stalling over a VPN.
         serviceCollection.AddHostedService(provider => provider.GetRequiredService<PartyTuner>());
     }
 }

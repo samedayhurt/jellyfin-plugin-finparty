@@ -76,21 +76,4 @@ public class PluginConfiguration : BasePluginConfiguration
     /// stall breaker releases the group.
     /// </summary>
     public int StallBreakerSeconds { get; set; } = 25;
-
-    /// <summary>
-    /// Gets or sets a value indicating whether users are granted SyncPlay access automatically
-    /// so nobody has to be talked through a settings page.
-    /// </summary>
-    public bool AutoGrantSyncPlayAccess { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets a value indicating whether non-administrators may pull other people's
-    /// devices into a party. When false, only administrators can.
-    /// </summary>
-    public bool AllowGuestsToInviteDevices { get; set; } = true;
-
-    /// <summary>
-    /// Gets or sets how long, in minutes, an idle party code stays valid.
-    /// </summary>
-    public int PartyCodeLifetimeMinutes { get; set; } = 240;
 }

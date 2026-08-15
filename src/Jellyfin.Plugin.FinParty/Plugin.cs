@@ -38,8 +38,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     /// <inheritdoc />
     public override string Description =>
-        "Watch parties for the whole family. Fixes SyncPlay over Tailscale, WireGuard and other high-latency links, " +
-        "and adds a phone-friendly party remote that works with any Jellyfin client.";
+        "Keeps Jellyfin SyncPlay from stalling over Tailscale, WireGuard and other high-latency links. " +
+        "Measures each group's real round-trip time, widens Jellyfin's timing tolerances to match, and " +
+        "stops one buffering device from freezing everyone. Headless — nothing to set up.";
 
     /// <summary>
     /// Gets the effective configuration, falling back to defaults when the plugin

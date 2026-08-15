@@ -81,7 +81,7 @@ public sealed class NetworkDoctor
     {
         var findings = new List<Finding>();
         var links = new List<object>();
-        var isAdmin = PartyManager.HasPermission(caller, PermissionKind.IsAdministrator);
+        var isAdmin = SessionRules.HasPermission(caller, PermissionKind.IsAdministrator);
 
         // Three states, not two. The per-group tolerance fields can only be resolved once a real
         // group object exists, so "no party has started yet" is normal and must not be reported
@@ -99,9 +99,9 @@ public sealed class NetworkDoctor
             findings.Add(new Finding(
                 "ok",
                 "Latency tuning is ready",
-                "FinParty is attached to Jellyfin's SyncPlay manager. The per-party tolerances are "
-                + "measured and applied once the first watch party starts.",
-                "Nothing to do — start a party and check back."));
+                "FinParty is attached to Jellyfin's SyncPlay manager. It measures and applies the "
+                + "tolerances the moment a SyncPlay group starts playing.",
+                "Nothing to do."));
         }
         else
         {
@@ -109,7 +109,7 @@ public sealed class NetworkDoctor
                 "warn",
                 "Latency tuning is not available",
                 $"FinParty could not attach to Jellyfin's SyncPlay manager ({_reflector.HealthSummary}). "
-                + "Parties still work, but with Jellyfin's fixed 500 ms drift tolerance.",
+                + "SyncPlay still works, but with Jellyfin's fixed 500 ms drift tolerance.",
                 "This usually means the Jellyfin version changed. Check for a FinParty update."));
         }
 
@@ -119,7 +119,7 @@ public sealed class NetworkDoctor
         {
             // Same reasoning as PartyManager: capability flags are not a reliable signal,
             // and filtering on them reported zero links on a server full of live televisions.
-            if (!PartyManager.IsPlausiblePlaybackDevice(session, DateTime.UtcNow))
+            if (!SessionRules.IsPlausiblePlaybackDevice(session, DateTime.UtcNow))
             {
                 continue;
             }
