@@ -11,6 +11,7 @@ using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.FinParty.Models;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
+using MediaBrowser.Model.Session;
 using MediaBrowser.Controller.SyncPlay;
 using MediaBrowser.Controller.SyncPlay.PlaybackRequests;
 using MediaBrowser.Controller.SyncPlay.Requests;
@@ -270,13 +271,95 @@ public sealed class PartyManager
         var startTicks = (long)Math.Max(0, request.StartSeconds) * TimeSpan.TicksPerSecond;
         var playRequest = new PlayGroupRequest(new[] { request.ItemId }, 0, startTicks);
 
+        // Set the group's queue and sync state. This keeps everyone aligned, but on its own it
+        // only affects clients that are *already* playing the item — Jellyfin SyncPlay does not
+        // start playback on an idle client.
         _syncPlayManager.HandleRequest(actor, playRequest, cancellationToken);
+
+        // So also cast the item to every member that Jellyfin can actually remote-control, which
+        // starts idle devices playing. Clients without remote control (e.g. Moonfin, which by its
+        // own source only syncs an item it is already playing) ignore this; the party state marks
+        // them so the remote can tell that person to press play themselves.
+        StartControllableDevices(record, actor, request.ItemId, startTicks, cancellationToken);
+
         record.Touch();
 
         _logger.LogInformation(
             "FinParty: {User} started playback in party {Code}.",
             caller.Username,
             record.Code);
+    }
+
+    /// <summary>
+    /// Casts the item to every party member Jellyfin can remote-control, so idle devices start.
+    /// </summary>
+    /// <param name="record">The party.</param>
+    /// <param name="actor">The session the request is attributed to.</param>
+    /// <param name="itemId">The item to start.</param>
+    /// <param name="startTicks">The start position.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    private void StartControllableDevices(
+        PartyRecord record,
+        SessionInfo actor,
+        Guid itemId,
+        long startTicks,
+        CancellationToken cancellationToken)
+    {
+        foreach (var sessionId in record.Roster.Keys)
+        {
+            var session = FindSession(sessionId);
+            if (session is null || !session.SupportsRemoteControl)
+            {
+                continue;
+            }
+
+            // Do not restart someone who is already on this item — that would yank them to the
+            // start position mid-scene.
+            if (session.NowPlayingItem is not null && session.NowPlayingItem.Id.Equals(itemId))
+            {
+                continue;
+            }
+
+            var play = new PlayRequest
+            {
+                ItemIds = new[] { itemId },
+                StartPositionTicks = startTicks,
+                PlayCommand = PlayCommand.PlayNow,
+                ControllingUserId = actor.UserId
+            };
+
+            try
+            {
+                // Fire and forget: one unreachable device must not block starting the others.
+                _ = _sessionManager.SendPlayCommand(actor.Id, session.Id, play, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "FinParty could not cast to {Device}.", session.DeviceName);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Determines whether a party member needs the person to press play on the device itself.
+    /// </summary>
+    /// <param name="session">The member's session, or <c>null</c> if offline.</param>
+    /// <param name="partyItemId">The item the party is playing, if any.</param>
+    /// <returns><c>true</c> when the device cannot be started remotely and is not already on the item.</returns>
+    private static bool NeedsManualStart(SessionInfo? session, Guid? partyItemId)
+    {
+        if (session is null || session.SupportsRemoteControl)
+        {
+            return false;
+        }
+
+        if (partyItemId is null || partyItemId.Value == Guid.Empty)
+        {
+            return false;
+        }
+
+        // Already watching the right thing → nothing to do.
+        return session.NowPlayingItem is null || !session.NowPlayingItem.Id.Equals(partyItemId.Value);
     }
 
     /// <summary>
@@ -682,7 +765,8 @@ public sealed class PartyManager
                     IsBuffering = member.IsBuffering,
                     Released = member.IgnoreGroupWait,
                     LatencyMs = stats.Samples > 0 ? stats.MedianMs : -1,
-                    LinkQuality = stats.Samples > 0 ? stats.Quality : "unknown"
+                    LinkQuality = stats.Samples > 0 ? stats.Quality : "unknown",
+                    NeedsManualStart = NeedsManualStart(session, state.NowPlayingItemId)
                 });
             }
 
@@ -706,7 +790,8 @@ public sealed class PartyManager
                     UserName = session.UserName ?? string.Empty,
                     DeviceName = session.DeviceName ?? string.Empty,
                     LatencyMs = stats.Samples > 0 ? stats.MedianMs : -1,
-                    LinkQuality = stats.Samples > 0 ? stats.Quality : "unknown"
+                    LinkQuality = stats.Samples > 0 ? stats.Quality : "unknown",
+                    NeedsManualStart = NeedsManualStart(session, state.NowPlayingItemId)
                 });
             }
         }

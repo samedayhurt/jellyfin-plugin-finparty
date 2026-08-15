@@ -230,6 +230,45 @@ Mitigations, in order of usefulness:
 
 ---
 
+## Finding 7: Moonfin cannot be made to start playing from idle
+
+Live testing on an all-Moonfin household showed the headline UX — "tap a movie on your phone
+and everyone's TV starts playing together" — **does not work with Moonfin**, and no server-side
+plugin can make it. This is a client limitation, confirmed against Moonfin's own source.
+
+Two server-side mechanisms could in principle start an idle device:
+
+1. **SyncPlay group play.** Jellyfin's `PlayGroupRequest` sets the group's queue and broadcasts a
+   play command. But SyncPlay only *synchronises clients already playing the item*. Moonfin's
+   [`syncplay_manager.dart`](https://github.com/Moonfin-Client/Moonfin-Core/blob/main/lib/syncplay/syncplay_manager.dart)
+   makes this explicit — `handlePlaybackCommand` returns early when
+   `command.playlistItemId != currentPlaylistItemId`, and `handleGroupUpdate` on `groupJoined`
+   only starts time-sync and ping loops; neither ever begins playback.
+2. **Remote control** (`POST /Sessions/{id}/Playing`, "cast to device"). Requires the client to
+   register a controllable session. Both Moonfin sessions tested report
+   `SupportsRemoteControl = false` and never call `Sessions/Capabilities/Full`, so the command is
+   accepted with `204` and silently dropped.
+
+So an idle Moonfin device has **no server-reachable control channel at all**. What Moonfin *does*
+support is being synchronised once the user has enabled SyncPlay and started the same item
+themselves.
+
+### What FinParty does about it
+
+- For every party member Jellyfin *can* remote-control (web, Jellyfin Media Player, official
+  apps, Kodi), FinParty issues a `PlayNow` remote command alongside the group play, so those
+  devices start on their own. This is the full "TVs start themselves" experience where the client
+  allows it.
+- For members it cannot (Moonfin), the party state carries `NeedsManualStart`, and the remote
+  says *"Open «title» on Risa's TV to sync up"* rather than spinning forever. Once that person
+  presses play, FinParty's tuning keeps them in sync — which is the part that actually needed
+  fixing over a VPN.
+
+The honest one-line summary: **FinParty makes watching-together *work* for everyone, and makes it
+*automatic* for every client except the ones that refuse server control.**
+
+---
+
 ## Reproducing the measurements
 
 The `GET /FinParty/api/health` endpoint reports, per session, the median RTT, the mean absolute

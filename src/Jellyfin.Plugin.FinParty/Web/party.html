@@ -584,8 +584,18 @@
       const waiting = state.anyoneBuffering;
       const stuck = state.members.filter(m => m.isBuffering);
 
+      const needStart = state.members.filter(m => m.needsManualStart);
+
       let statusText, statusClass;
-      if (waiting) {
+      if (needStart.length) {
+        // These devices (e.g. Moonfin) can't be started from here — the person has to
+        // press play on the TV itself, then it syncs up automatically.
+        statusClass = 'warn';
+        const who = needStart.map(m => esc(m.userName || m.deviceName)).join(', ');
+        statusText = state.nowPlaying
+          ? `Open "${esc(state.nowPlaying)}" on ${who}'s TV to sync up`
+          : `${who} need to start the show on their TV`;
+      } else if (waiting) {
         statusClass = 'warn';
         statusText = stuck.length === 1
           ? `Waiting for ${esc(stuck[0].userName || stuck[0].deviceName)}…`
@@ -634,6 +644,7 @@
               <div class="meta">
                 <b>${esc(m.userName || m.deviceName)}</b>
                 <small>${esc(m.deviceName)} ${qualityChip(m.linkQuality, m.latencyMs)}
+                  ${m.needsManualStart ? '<span class="chip warn">press play on this TV</span>' : ''}
                   ${m.isBuffering ? '<span class="chip warn">loading…</span>' : ''}
                   ${m.released ? '<span class="chip">catching up on their own</span>' : ''}</small>
               </div>

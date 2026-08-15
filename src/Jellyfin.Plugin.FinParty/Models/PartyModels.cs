@@ -77,6 +77,13 @@ public class FinPartyMemberDto
 
     /// <summary>Gets or sets a plain-language link quality label.</summary>
     public string LinkQuality { get; set; } = "unknown";
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this device cannot be started remotely and the
+    /// person needs to press play on it themselves (e.g. Moonfin, which only syncs an item it
+    /// is already playing).
+    /// </summary>
+    public bool NeedsManualStart { get; set; }
 }
 
 /// <summary>
