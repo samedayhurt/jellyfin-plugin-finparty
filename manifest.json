@@ -7,6 +7,15 @@
         "owner": "samedayhurt",
         "category": "General",
         "imageUrl": "",
-        "versions": []
+        "versions": [
+            {
+                "version": "1.1.0.0",
+                "changelog": "",
+                "targetAbi": "10.11.0.0",
+                "checksum": "883f006f8ed101160576673b582a4f9e",
+                "timestamp": "2026-08-15T13:37:12Z",
+                "sourceUrl": "https://github.com/samedayhurt/jellyfin-plugin-finparty/releases/download/v1.1.0/finparty_1.1.0.0.zip"
+            }
+        ]
     }
 ]
