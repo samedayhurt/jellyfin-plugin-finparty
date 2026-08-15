@@ -53,6 +53,9 @@ public sealed class PartyTuner : BackgroundService
     private readonly ConcurrentDictionary<string, DateTime> _bufferingSince = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _released = new(StringComparer.Ordinal);
 
+    // Last observed raw ping per session, used to record only genuine changes and skip the seed.
+    private readonly ConcurrentDictionary<string, long> _lastPing = new(StringComparer.Ordinal);
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PartyTuner"/> class.
     /// </summary>
@@ -125,6 +128,7 @@ public sealed class PartyTuner : BackgroundService
                 _applied.Clear();
                 _bufferingSince.Clear();
                 _released.Clear();
+                _lastPing.Clear();
             }
 
             return;
@@ -138,7 +142,7 @@ public sealed class PartyTuner : BackgroundService
             liveGroupIds.Add(group.GroupId);
 
             var members = _reflector.GetParticipants(group);
-            SampleLatency(group, members);
+            SampleLatency(members);
 
             if (config.Tuning != TuningMode.Off)
             {
@@ -156,7 +160,12 @@ public sealed class PartyTuner : BackgroundService
             _applied.TryRemove(staleGroupId, out _);
         }
 
-        _latency.Prune(sessions.Keys.ToHashSet(StringComparer.Ordinal));
+        var live = sessions.Keys.ToHashSet(StringComparer.Ordinal);
+        _latency.Prune(live);
+        foreach (var dead in _lastPing.Keys.Where(id => !live.Contains(id)).ToList())
+        {
+            _lastPing.TryRemove(dead, out _);
+        }
     }
 
     private Dictionary<string, SessionInfo> BuildSessionIndex()
@@ -174,13 +183,25 @@ public sealed class PartyTuner : BackgroundService
         return index;
     }
 
-    private void SampleLatency(IGroupStateContext group, IReadOnlyDictionary<string, GroupMember> members)
+    private void SampleLatency(IReadOnlyDictionary<string, GroupMember> members)
     {
         foreach (var member in members.Values)
         {
-            // A member that has never reported a ping carries the group's DefaultPing verbatim.
-            // Skipping that exact value keeps the seed out of the measured window.
-            if (member.Ping > 0 && member.Ping != group.DefaultPing)
+            if (member.Ping <= 0)
+            {
+                continue;
+            }
+
+            // Jellyfin seeds GroupMember.Ping once when the session joins and only ever changes
+            // it when a real client ping arrives. So record on *change*, not on "differs from the
+            // current DefaultPing" — the old test wrongly recorded the static seed once FinParty
+            // had retuned DefaultPing, manufacturing jitter for clients that never ping at all
+            // (e.g. Moonfin). A member whose value never moves contributes nothing, which is the
+            // honest answer: we have no measurement, so tuning falls back to the configured floor.
+            var previous = _lastPing.TryGetValue(member.SessionId, out var last) ? (long?)last : null;
+            _lastPing[member.SessionId] = member.Ping;
+
+            if (previous.HasValue && previous.Value != member.Ping)
             {
                 _latency.Record(member.SessionId, member.Ping);
             }

@@ -342,6 +342,7 @@ public class FinPartyController : ControllerBase
     /// Lists items the caller can start a party with.
     /// </summary>
     /// <param name="q">An optional search term.</param>
+    /// <param name="parentId">An optional show or season to list the children of.</param>
     /// <param name="limit">The maximum number of results.</param>
     /// <returns>The matching items.</returns>
     [HttpGet("api/library")]
