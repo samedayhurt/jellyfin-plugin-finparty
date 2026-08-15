@@ -41,8 +41,12 @@ public class FinPartyDeviceDto
     /// <summary>Gets or sets a plain-language link quality label.</summary>
     public string LinkQuality { get; set; } = "unknown";
 
-    /// <summary>Gets or sets a value indicating whether the client advertises SyncPlay support.</summary>
+    /// <summary>Gets or sets a value indicating whether the client advertises media control.
+    /// Informational only: several clients advertise nothing yet work fine in a party.</summary>
     public bool SupportsSyncPlay { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether the client reported no capabilities at all.</summary>
+    public bool AdvertisesNothing { get; set; }
 
     /// <summary>Gets or sets seconds since the device was last seen.</summary>
     public double IdleSeconds { get; set; }

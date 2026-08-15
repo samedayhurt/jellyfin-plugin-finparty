@@ -116,16 +116,7 @@ public sealed class PartyManager
                 continue;
             }
 
-            // A device that cannot be told what to play is no use in a party.
-            if (!session.SupportsMediaControl)
-            {
-                continue;
-            }
-
-            // The remote authenticates like any other client and therefore owns a session of its
-            // own. It must never be offered as a party member: a session that joins but never
-            // reports itself ready leaves the group waiting forever.
-            if (IsRemoteSession(session))
+            if (!IsPlausiblePlaybackDevice(session, DateTime.UtcNow))
             {
                 continue;
             }
@@ -152,6 +143,7 @@ public sealed class PartyManager
                 LatencyMs = stats.Samples > 0 ? stats.MedianMs : -1,
                 LinkQuality = stats.Samples > 0 ? stats.Quality : "unknown",
                 SupportsSyncPlay = session.SupportsMediaControl,
+                AdvertisesNothing = !session.SupportsMediaControl,
                 IdleSeconds = Math.Max(0, (now - session.LastActivityDate).TotalSeconds)
             });
         }
@@ -451,6 +443,11 @@ public sealed class PartyManager
     }
 
     /// <summary>
+    /// How long after its last check-in a session is still offered as a party candidate.
+    /// </summary>
+    private static readonly TimeSpan DeviceIdleWindow = TimeSpan.FromMinutes(30);
+
+    /// <summary>
     /// Determines whether a session is a FinParty remote rather than a playback device.
     /// </summary>
     /// <param name="session">The session.</param>
@@ -458,6 +455,71 @@ public sealed class PartyManager
     public static bool IsRemoteSession(SessionInfo session)
         => session.Client is not null
            && session.Client.StartsWith("FinParty", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Decides whether a session should be offered as something you can add to a party.
+    /// </summary>
+    /// <param name="session">The session.</param>
+    /// <param name="nowUtc">The current time.</param>
+    /// <returns><c>true</c> when the session is a plausible playback device.</returns>
+    public static bool IsPlausiblePlaybackDevice(SessionInfo session, DateTime nowUtc)
+        => IsPlausiblePlaybackDevice(
+            session.UserId,
+            session.Client,
+            session.DeviceName,
+            session.LastActivityDate,
+            nowUtc);
+
+    /// <summary>
+    /// The device test, in terms that can be exercised without constructing a session.
+    /// </summary>
+    /// <remarks>
+    /// This deliberately does <b>not</b> consult <c>SupportsMediaControl</c> or the advertised
+    /// capabilities. Clients are wildly inconsistent about reporting them: Moonfin for Android TV
+    /// 2.4.0 reports <c>SupportsMediaControl=false</c> with empty <c>PlayableMediaTypes</c> and
+    /// <c>SupportedCommands</c> while happily direct-playing a film, because it never calls
+    /// <c>Sessions/Capabilities/Full</c>. Filtering on those flags hid every real television on
+    /// the test server and left the device picker empty.
+    /// <para>
+    /// There is no capability a client advertises that means "supports SyncPlay", so the honest
+    /// test is simply: a real user, a real device, not our own remote, and seen recently. A device
+    /// that cannot act on the group update fails visibly at join time, which is a far better
+    /// outcome than never being offered at all.
+    /// </para>
+    /// </remarks>
+    /// <param name="userId">The session's user.</param>
+    /// <param name="client">The client application name.</param>
+    /// <param name="deviceName">The device name.</param>
+    /// <param name="lastActivityUtc">When the session last checked in.</param>
+    /// <param name="nowUtc">The current time.</param>
+    /// <returns><c>true</c> when the session is a plausible playback device.</returns>
+    public static bool IsPlausiblePlaybackDevice(
+        Guid userId,
+        string? client,
+        string? deviceName,
+        DateTime lastActivityUtc,
+        DateTime nowUtc)
+    {
+        // A session with no user cannot own playback; this also drops API-key and service sessions.
+        if (userId.Equals(default))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(deviceName))
+        {
+            return false;
+        }
+
+        // The remote owns a session of its own and must never be offered as a party member:
+        // a session that joins but never reports itself ready leaves the group waiting forever.
+        if (client is not null && client.StartsWith("FinParty", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return nowUtc - lastActivityUtc < DeviceIdleWindow;
+    }
 
     private static string DefaultPartyName(User caller)
         => string.Create(CultureInfo.InvariantCulture, $"{caller.Username}'s watch party");

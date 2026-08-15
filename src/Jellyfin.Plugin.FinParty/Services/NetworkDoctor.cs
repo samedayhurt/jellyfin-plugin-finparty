@@ -83,24 +83,43 @@ public sealed class NetworkDoctor
         var links = new List<object>();
         var isAdmin = PartyManager.HasPermission(caller, PermissionKind.IsAdministrator);
 
-        findings.Add(_reflector.CanTune
-            ? new Finding(
+        // Three states, not two. The per-group tolerance fields can only be resolved once a real
+        // group object exists, so "no party has started yet" is normal and must not be reported
+        // as a failure — that reads as broken on a perfectly healthy server.
+        if (_reflector.CanTune)
+        {
+            findings.Add(new Finding(
                 "ok",
                 "Latency tuning is active",
-                "FinParty can widen SyncPlay's timing tolerances to match your network.",
-                "Nothing to do.")
-            : new Finding(
+                "FinParty is widening SyncPlay's timing tolerances to match your network.",
+                "Nothing to do."));
+        }
+        else if (_reflector.IsAvailable)
+        {
+            findings.Add(new Finding(
+                "ok",
+                "Latency tuning is ready",
+                "FinParty is attached to Jellyfin's SyncPlay manager. The per-party tolerances are "
+                + "measured and applied once the first watch party starts.",
+                "Nothing to do — start a party and check back."));
+        }
+        else
+        {
+            findings.Add(new Finding(
                 "warn",
-                "Latency tuning is not active",
-                $"FinParty could not bind to Jellyfin's SyncPlay internals ({_reflector.HealthSummary}). " +
-                "Parties fall back to Jellyfin's fixed 500 ms drift tolerance.",
+                "Latency tuning is not available",
+                $"FinParty could not attach to Jellyfin's SyncPlay manager ({_reflector.HealthSummary}). "
+                + "Parties still work, but with Jellyfin's fixed 500 ms drift tolerance.",
                 "This usually means the Jellyfin version changed. Check for a FinParty update."));
+        }
 
         var transcoding = 0;
 
         foreach (var session in _sessionManager.Sessions)
         {
-            if (!session.SupportsMediaControl || session.UserId.Equals(default))
+            // Same reasoning as PartyManager: capability flags are not a reliable signal,
+            // and filtering on them reported zero links on a server full of live televisions.
+            if (!PartyManager.IsPlausiblePlaybackDevice(session, DateTime.UtcNow))
             {
                 continue;
             }
