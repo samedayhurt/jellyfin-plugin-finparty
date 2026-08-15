@@ -346,61 +346,100 @@ public class FinPartyController : ControllerBase
     /// <returns>The matching items.</returns>
     [HttpGet("api/library")]
     [Authorize]
-    public ActionResult GetFinPartyLibrary([FromQuery] string? q, [FromQuery] int limit = 40)
-        => Execute(user => Browse(user, q, Math.Clamp(limit, 1, 100)));
+    public ActionResult GetFinPartyLibrary(
+        [FromQuery] string? q,
+        [FromQuery] Guid? parentId,
+        [FromQuery] int limit = 40)
+        => Execute(user => Browse(user, q, parentId, Math.Clamp(limit, 1, 100)));
 
-    private IReadOnlyList<object> Browse(User user, string? searchTerm, int limit)
+    private IReadOnlyList<object> Browse(User user, string? searchTerm, Guid? parentId, int limit)
     {
         var query = new InternalItemsQuery(user)
         {
-            IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode },
-            Recursive = true,
             Limit = limit,
-            IsVirtualItem = false,
-            OrderBy = new[]
-            {
-                (ItemSortBy.DateCreated, SortOrder.Descending)
-            }
+            IsVirtualItem = false
         };
 
-        if (!string.IsNullOrWhiteSpace(searchTerm))
+        if (parentId.HasValue && parentId.Value != Guid.Empty)
         {
+            // Drilling into a show: return its seasons, or a season's episodes, in order.
+            query.ParentId = parentId.Value;
+            query.IncludeItemTypes = new[] { BaseItemKind.Season, BaseItemKind.Episode };
+            query.OrderBy = new[]
+            {
+                (ItemSortBy.ParentIndexNumber, SortOrder.Ascending),
+                (ItemSortBy.IndexNumber, SortOrder.Ascending)
+            };
+        }
+        else if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            // Searching: match on the things a person types the name of — movies and shows.
+            // Episodes are excluded here because they are named "A Father", not the show name,
+            // so they only add noise; you reach them by opening the show.
             query.SearchTerm = searchTerm.Trim();
-            query.OrderBy = Array.Empty<(ItemSortBy, SortOrder)>();
+            query.Recursive = true;
+            query.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Series };
+        }
+        else
+        {
+            // Idle browse: most-recently-added movies and shows.
+            query.Recursive = true;
+            query.IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Series };
+            query.OrderBy = new[] { (ItemSortBy.DateCreated, SortOrder.Descending) };
         }
 
         return _libraryManager.GetItemList(query)
-            .Select(item => (object)new
+            .Select(item =>
             {
-                id = item.Id,
-                name = item.Name,
-                type = item.GetBaseItemKind().ToString(),
-                seriesName = (item as Episode)?.SeriesName,
-                year = item.ProductionYear,
-                runtimeSeconds = TimeSpan.FromTicks(item.RunTimeTicks ?? 0).TotalSeconds,
-                subtitle = BuildSubtitle(item)
+                var kind = item.GetBaseItemKind();
+                // Movies and episodes can be played directly; shows and seasons are opened.
+                var playable = kind is BaseItemKind.Movie or BaseItemKind.Episode;
+                return (object)new
+                {
+                    id = item.Id,
+                    name = item.Name,
+                    type = kind.ToString(),
+                    playable,
+                    seriesName = (item as Episode)?.SeriesName,
+                    year = item.ProductionYear,
+                    runtimeSeconds = TimeSpan.FromTicks(item.RunTimeTicks ?? 0).TotalSeconds,
+                    subtitle = BuildSubtitle(item)
+                };
             })
             .ToList();
     }
 
     private static string BuildSubtitle(BaseItem item)
     {
-        if (item is Episode episode)
+        switch (item)
         {
-            var season = episode.ParentIndexNumber;
-            var number = episode.IndexNumber;
-
-            if (season.HasValue && number.HasValue)
+            case Episode episode:
             {
-                return string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"{episode.SeriesName} · S{season:00}E{number:00}");
+                var season = episode.ParentIndexNumber;
+                var number = episode.IndexNumber;
+
+                if (season.HasValue && number.HasValue)
+                {
+                    return string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"{episode.SeriesName} · S{season:00}E{number:00}");
+                }
+
+                return episode.SeriesName ?? string.Empty;
             }
 
-            return episode.SeriesName ?? string.Empty;
-        }
+            case Season season:
+                return season.SeriesName ?? "Season";
 
-        return item.ProductionYear?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+            case Series series:
+            {
+                var years = series.ProductionYear?.ToString(CultureInfo.InvariantCulture);
+                return string.IsNullOrEmpty(years) ? "TV series" : $"TV series · {years}";
+            }
+
+            default:
+                return item.ProductionYear?.ToString(CultureInfo.InvariantCulture) ?? string.Empty;
+        }
     }
 
     private User? GetCaller()

@@ -508,24 +508,54 @@
     document.getElementById('skip').onclick = () => createParty(null);
 
     const results = document.getElementById('results');
+    const crumb = [];  // stack of {id, name} for drilling into shows
 
-    const load = async term => {
+    const icon = i => {
+      if (i.type === 'Series') return '📺';
+      if (i.type === 'Season') return '🗂️';
+      if (i.type === 'Episode') return '▶️';
+      return '🎬';
+    };
+
+    const load = async ({ term = '', parentId = null } = {}) => {
       results.innerHTML = '<div class="spinner"></div>';
+      const params = new URLSearchParams();
+      if (parentId) params.set('parentId', parentId);
+      else if (term) params.set('q', term);
       try {
-        const items = await api(`api/library${term ? `?q=${encodeURIComponent(term)}` : ''}`);
-        results.innerHTML = items.length
+        const items = await api(`api/library${params.toString() ? `?${params}` : ''}`);
+        const back = crumb.length
+          ? `<button class="item" id="up"><div class="art">↩️</div>
+               <div class="meta"><b>Back to ${esc(crumb[crumb.length - 1].name)}</b></div></button>`
+          : '';
+        results.innerHTML = back + (items.length
           ? items.map(i => `
-              <button class="item" data-id="${esc(i.id)}">
-                <div class="art">${i.type === 'Episode' ? '📺' : '🎞️'}</div>
+              <button class="item" data-id="${esc(i.id)}" data-play="${i.playable ? 1 : 0}"
+                      data-name="${esc(i.name)}">
+                <div class="art">${icon(i)}</div>
                 <div class="meta">
                   <b>${esc(i.name)}</b>
-                  <small>${esc(i.subtitle || i.type)}</small>
+                  <small>${esc(i.subtitle || i.type)}${i.playable ? '' : ' · tap to open'}</small>
                 </div>
               </button>`).join('')
-          : '<p class="muted center">Nothing found. Try a different word.</p>';
+          : '<p class="muted center">Nothing found. Try a different word.</p>');
+
+        const up = document.getElementById('up');
+        if (up) up.onclick = () => {
+          crumb.pop();
+          const parent = crumb[crumb.length - 1];
+          load(parent ? { parentId: parent.id } : {});
+        };
 
         results.querySelectorAll('[data-id]').forEach(el => {
-          el.onclick = () => createParty(el.dataset.id);
+          el.onclick = () => {
+            if (el.dataset.play === '1') {
+              createParty(el.dataset.id);       // a movie or episode → start the party
+            } else {
+              crumb.push({ id: el.dataset.id, name: el.dataset.name });
+              load({ parentId: el.dataset.id }); // a show or season → open it
+            }
+          };
         });
       } catch (err) {
         if (err.message !== 'unauthorized') results.innerHTML =
@@ -536,11 +566,12 @@
     let debounce;
     document.getElementById('q').oninput = e => {
       clearTimeout(debounce);
+      crumb.length = 0;
       const term = e.target.value.trim();
-      debounce = setTimeout(() => load(term), 280);
+      debounce = setTimeout(() => load({ term }), 280);
     };
 
-    load('');
+    load({});
   }
 
   async function createParty(itemId) {
