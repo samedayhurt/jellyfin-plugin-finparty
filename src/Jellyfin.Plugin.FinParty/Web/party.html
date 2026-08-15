@@ -234,13 +234,29 @@
     }
 
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = text ? camelize(JSON.parse(text)) : null;
 
     if (!res.ok) {
       throw new Error((data && data.error) || `Something went wrong (${res.status}).`);
     }
 
     return data;
+  }
+
+  // Jellyfin serialises plugin API responses in PascalCase (SessionId, DeviceName),
+  // matching the rest of its API. This UI is written in camelCase, so normalise every
+  // key on the way in. Doing it here means no view has to care what casing the server used.
+  function camelize(value) {
+    if (Array.isArray(value)) return value.map(camelize);
+    if (value && typeof value === 'object') {
+      const out = {};
+      for (const [key, v] of Object.entries(value)) {
+        const camel = key.length ? key[0].toLowerCase() + key.slice(1) : key;
+        out[camel] = camelize(v);
+      }
+      return out;
+    }
+    return value;
   }
 
   let toastTimer;
