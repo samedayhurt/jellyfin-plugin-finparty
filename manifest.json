@@ -9,6 +9,14 @@
         "imageUrl": "",
         "versions": [
             {
+                "version": "1.0.4.0",
+                "changelog": "",
+                "targetAbi": "10.11.0.0",
+                "checksum": "8e0856cbf37996596ddd31a7ac5d8743",
+                "timestamp": "2026-08-15T00:19:49Z",
+                "sourceUrl": "https://github.com/samedayhurt/jellyfin-plugin-finparty/releases/download/v1.0.4/finparty_1.0.4.0.zip"
+            },
+            {
                 "version": "1.0.3.0",
                 "changelog": "",
                 "targetAbi": "10.11.0.0",
