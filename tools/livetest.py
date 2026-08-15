@@ -135,6 +135,25 @@ def _maybe_json(raw: str) -> object | str | None:
         return raw
 
 
+def cget(obj: object, name: str, default: object = None) -> object:
+    """Case-insensitive field lookup.
+
+    FinParty endpoints return a mix of casings — DTOs serialise as PascalCase
+    (SessionId), anonymous projections as camelCase (sessionId). A test harness
+    must not care which; reading the wrong case is exactly the bug that shipped
+    a blank remote to users, so the harness reads either.
+    """
+    if not isinstance(obj, dict):
+        return default
+    if name in obj:
+        return obj[name]
+    lowered = name.lower()
+    for key, value in obj.items():
+        if key.lower() == lowered:
+            return value
+    return default
+
+
 # --------------------------------------------------------------------------- stages
 
 
@@ -272,22 +291,82 @@ def stage_verify(jf: Jellyfin) -> dict | None:
         ok(f"device list returned {len(devices)} candidate(s)")
         for device in devices:
             print(
-                f"       {device.get('sessionId')}  {device.get('deviceName')!r} "
-                f"({device.get('client')}) user={device.get('userName')} "
-                f"inParty={device.get('inParty')}"
+                f"       {cget(device, 'sessionId')}  {cget(device, 'deviceName')!r} "
+                f"({cget(device, 'client')}) user={cget(device, 'userName')} "
+                f"inParty={cget(device, 'inParty')}"
             )
     else:
         fail(f"device list failed (HTTP {status}): {devices}")
 
     status, library = jf.request("GET", "/FinParty/api/library", params={"limit": "3"})
     if status == 200 and isinstance(library, list) and library:
-        ok(f"library browse works (e.g. {library[0].get('name')!r})")
+        ok(f"library browse works (e.g. {cget(library[0], 'name')!r})")
     elif status == 200:
         warn("library browse returned nothing — is the library empty for this user?")
     else:
         fail(f"library browse failed (HTTP {status}): {library}")
 
+    search_check(jf)
+
     return health
+
+
+def verify_devices_actually_play(jf: Jellyfin, device_ids: list[str], settle: float = 20.0) -> None:
+    """Confirm each targeted device's session really started playing.
+
+    Reproduces the most important live finding: a native client (e.g. Moonfin for
+    Android TV) can accept the server-side group join and the group reports Playing,
+    yet an idle client never loads the queued item, so the television stays dark.
+    Fails loudly with that exact diagnosis rather than trusting the group state.
+    """
+    heading("Stage: does the media actually start on the device?")
+    deadline = time.time() + settle
+    wanted = set(device_ids)
+    playing: set[str] = set()
+
+    while time.time() < deadline and playing != wanted:
+        time.sleep(3)
+        status, sessions = jf.request("GET", "/Sessions")
+        if status != 200 or not isinstance(sessions, list):
+            continue
+        for session in sessions:
+            sid = cget(session, "Id")
+            if sid in wanted and cget(session, "NowPlayingItem"):
+                playing.add(sid)
+
+    for sid in device_ids:
+        if sid in playing:
+            ok(f"device {sid} is actually playing the item")
+        else:
+            fail(
+                f"device {sid} JOINED the party but never started playing. "
+                "The group is Playing server-side, but this client did not load the "
+                "queued item — the 'TVs join by themselves' promise fails for it. "
+                "Likely the client ignores a server-initiated SyncPlay queue when idle; "
+                "starting playback may need a remote-control Play command first."
+            )
+
+
+def search_check(jf: Jellyfin) -> None:
+    """Exercise library search the way the remote's search box does."""
+    status, base = jf.request("GET", "/FinParty/api/library", params={"limit": "1"})
+    if status != 200 or not isinstance(base, list) or not base:
+        warn("cannot run search check — library browse returned nothing")
+        return
+
+    term = str(cget(base[0], "name", "")).split(" ")[0]
+    if not term:
+        return
+
+    status, results = jf.request("GET", "/FinParty/api/library", params={"q": term, "limit": "10"})
+    if status != 200 or not isinstance(results, list):
+        fail(f"search for {term!r} failed (HTTP {status}): {results}")
+        return
+
+    if results:
+        ok(f"search {term!r} returned {len(results)} result(s) (e.g. {cget(results[0], 'name')!r})")
+    else:
+        fail(f"search {term!r} returned nothing, though it came from a real title")
 
 
 def stage_party(jf: Jellyfin, device_ids: list[str], item_id: str | None, confirmed: bool) -> None:
@@ -310,14 +389,14 @@ def stage_party(jf: Jellyfin, device_ids: list[str], item_id: str | None, confir
         fail(f"could not create the party (HTTP {status}): {payload}")
         return
 
-    party = payload.get("party") or {}
-    invites = payload.get("invites") or {}
-    group_id = party.get("groupId")
+    party = cget(payload, "party") or {}
+    invites = cget(payload, "invites") or {}
+    group_id = cget(party, "groupId")
 
-    ok(f"party created: code {party.get('code')} group {group_id}")
+    ok(f"party created: code {cget(party, 'code')} group {group_id}")
 
-    joined = invites.get("joined") or []
-    for session_id, reason in (invites.get("failed") or {}).items():
+    joined = cget(invites, "joined") or []
+    for session_id, reason in (cget(invites, "failed") or {}).items():
         fail(f"device {session_id} could not join: {reason}")
 
     if len(joined) == len(device_ids):
@@ -336,38 +415,45 @@ def stage_party(jf: Jellyfin, device_ids: list[str], item_id: str | None, confir
                 fail(f"could not read party state (HTTP {status}): {state}")
                 break
 
-            members = state.get("members") or []
-            tuning = state.get("tuning")
-            buffering = [m.get("userName") for m in members if m.get("isBuffering")]
+            members = cget(state, "members") or []
+            tuning = cget(state, "tuning")
+            buffering = [cget(m, "userName") for m in members if cget(m, "isBuffering")]
 
             line = (
-                f"t+{(attempt + 1) * 2:>3}s  state={state.get('state'):<8} "
-                f"members={len(members)} pos={state.get('positionSeconds', 0):.0f}s "
+                f"t+{(attempt + 1) * 2:>3}s  state={cget(state, 'state'):<8} "
+                f"members={len(members)} pos={cget(state, 'positionSeconds', 0):.0f}s "
                 f"buffering={buffering or '-'}"
             )
             if tuning:
                 line += (
-                    f" | tolerance={tuning.get('maxPlaybackOffsetMs')}ms "
-                    f"rtt={tuning.get('observedRttMs')}ms "
-                    f"jitter={tuning.get('observedJitterMs')}ms"
+                    f" | tolerance={cget(tuning, 'maxPlaybackOffsetMs')}ms "
+                    f"rtt={cget(tuning, 'observedRttMs')}ms "
+                    f"jitter={cget(tuning, 'observedJitterMs')}ms"
                 )
             info(line)
 
             if tuning and not seen_tuning:
                 seen_tuning = True
-                ok(f"tuner picked the group up: {tuning.get('explanation')}")
-                if tuning.get("maxPlaybackOffsetMs", 0) > 500:
+                ok(f"tuner picked the group up: {cget(tuning, 'explanation')}")
+                if (cget(tuning, "maxPlaybackOffsetMs") or 0) > 500:
                     ok(
-                        f"tolerance is {tuning.get('maxPlaybackOffsetMs')}ms, wider than "
+                        f"tolerance is {cget(tuning, 'maxPlaybackOffsetMs')}ms, wider than "
                         "Jellyfin's fixed 500ms"
                     )
 
-            if state.get("state") == "Playing" and not buffering:
+            if cget(state, "state") == "Playing" and not buffering:
                 ok("party reached Playing with nobody buffering")
                 break
 
         if not seen_tuning:
             fail("the tuner never produced a snapshot for this group")
+
+        # The make-or-break check: SyncPlay can report the GROUP as Playing while a
+        # client that was idle never actually loads the media. Verify each target
+        # device's own session really entered playback — a green group with dark TVs
+        # is the failure that matters most to a family.
+        if item_id:
+            verify_devices_actually_play(jf, device_ids)
 
         if item_id:
             heading("Stage: transport")
