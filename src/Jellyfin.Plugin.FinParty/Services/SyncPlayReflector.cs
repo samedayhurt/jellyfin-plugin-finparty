@@ -142,6 +142,24 @@ public sealed class SyncPlayReflector
         => GetGroups().FirstOrDefault(g => g.GroupId.Equals(groupId));
 
     /// <summary>
+    /// Reads a group's display name (the public <c>GroupName</c> property, not on the interface).
+    /// </summary>
+    /// <param name="group">The group.</param>
+    /// <returns>The name, or <c>null</c> when unavailable.</returns>
+    public string? GetGroupName(IGroupStateContext group)
+    {
+        try
+        {
+            return group.GetType().GetProperty("GroupName")?.GetValue(group) as string;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "FinParty could not read the name of group {GroupId}.", group.GroupId);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Reads the participants of a group, keyed by session id.
     /// </summary>
     /// <param name="group">The group.</param>

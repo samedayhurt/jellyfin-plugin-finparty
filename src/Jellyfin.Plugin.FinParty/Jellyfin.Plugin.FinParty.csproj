@@ -8,9 +8,9 @@
     <ImplicitUsings>false</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Version>1.0.8.0</Version>
-    <AssemblyVersion>1.0.8.0</AssemblyVersion>
-    <FileVersion>1.0.8.0</FileVersion>
+    <Version>1.0.9.0</Version>
+    <AssemblyVersion>1.0.9.0</AssemblyVersion>
+    <FileVersion>1.0.9.0</FileVersion>
     <Company>FinParty</Company>
     <Product>FinParty</Product>
     <Description>SyncPlay watch parties for Jellyfin that survive Tailscale, WireGuard and other high-latency links.</Description>

@@ -418,7 +418,62 @@ public sealed class PartyManager
     public IReadOnlyList<FinPartyStateDto> GetParties()
     {
         Prune();
+        AdoptLiveGroups();
         return _byGroup.Values.Select(BuildState).ToList();
+    }
+
+    /// <summary>
+    /// Brings any live SyncPlay group FinParty did not create under its control.
+    /// </summary>
+    /// <remarks>
+    /// Moonfin only actually participates in SyncPlay when the user joins a group from Moonfin's
+    /// own SyncPlay screen — a server-side JoinGroup does not activate its engine. Verified live:
+    /// a command sent to the group the user joined in Moonfin does reach and control the device.
+    /// So the phone remote must drive whatever group the devices are genuinely in, not only the
+    /// ones FinParty assembled. This adopts those groups so they appear and can be controlled.
+    /// </remarks>
+    private void AdoptLiveGroups()
+    {
+        if (!_reflector.IsAvailable)
+        {
+            return;
+        }
+
+        foreach (var group in _reflector.GetGroups())
+        {
+            if (_byGroup.ContainsKey(group.GroupId))
+            {
+                continue;
+            }
+
+            var participants = _reflector.GetParticipants(group);
+            if (participants.Count == 0)
+            {
+                continue;
+            }
+
+            var name = _reflector.GetGroupName(group);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = "Watch party";
+            }
+
+            var record = new PartyRecord(group.GroupId, NewCode(), name, Guid.Empty);
+            foreach (var sessionId in participants.Keys)
+            {
+                record.Roster[sessionId] = 0;
+            }
+
+            if (_byGroup.TryAdd(group.GroupId, record))
+            {
+                _byCode[record.Code] = record;
+                _logger.LogInformation(
+                    "FinParty adopted existing SyncPlay group {GroupId} ({Name}) with {Count} member(s).",
+                    group.GroupId.ToString(),
+                    name,
+                    participants.Count);
+            }
+        }
     }
 
     /// <summary>
@@ -699,6 +754,12 @@ public sealed class PartyManager
     private PartyRecord RequireParty(Guid groupId)
     {
         Prune();
+
+        // Pick up groups formed in a client (e.g. Moonfin) so the remote can control them too.
+        if (!_byGroup.ContainsKey(groupId))
+        {
+            AdoptLiveGroups();
+        }
 
         if (!_byGroup.TryGetValue(groupId, out var record))
         {
