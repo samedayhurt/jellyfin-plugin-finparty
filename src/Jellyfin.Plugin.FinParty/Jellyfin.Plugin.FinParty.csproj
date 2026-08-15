@@ -8,22 +8,30 @@
     <ImplicitUsings>false</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Version>1.0.3.0</Version>
-    <AssemblyVersion>1.0.3.0</AssemblyVersion>
-    <FileVersion>1.0.3.0</FileVersion>
+    <Version>1.0.4.0</Version>
+    <AssemblyVersion>1.0.4.0</AssemblyVersion>
+    <FileVersion>1.0.4.0</FileVersion>
     <Company>FinParty</Company>
     <Product>FinParty</Product>
     <Description>SyncPlay watch parties for Jellyfin that survive Tailscale, WireGuard and other high-latency links.</Description>
     <!-- Plugins must never ship their own copy of the host's assemblies. -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
-    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!--
+      Deliberately NOT setting EnableDynamicLoading. It makes the SDK emit a .deps.json
+      describing this assembly's dependency graph, which the plugin package does not ship,
+      and it is not what working Jellyfin plugins do. Jellyfin loads plugin assemblies itself
+      and supplies every dependency from the host.
+    -->
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Host-provided: referenced to compile against, never copied or shipped. -->
     <PackageReference Include="Jellyfin.Controller" Version="10.11.11">
+      <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
     <PackageReference Include="Jellyfin.Model" Version="10.11.11">
+      <PrivateAssets>all</PrivateAssets>
       <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>

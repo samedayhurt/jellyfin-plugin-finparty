@@ -74,10 +74,25 @@ public class FinPartyController : ControllerBase
     /// </summary>
     /// <returns>The remote's HTML.</returns>
     [HttpGet("")]
+    [AllowAnonymous]
+    [Produces(MediaTypeNames.Text.Html)]
+    public ActionResult GetFinPartyRemote() => ServeRemote();
+
+    /// <summary>
+    /// Serves the party remote at its explicit index path.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately a separate action rather than a second <c>[HttpGet]</c> on the one above:
+    /// Jellyfin derives the OpenAPI operationId from the method name, so two routes sharing a
+    /// method emit two operations with the same operationId and an invalid document.
+    /// </remarks>
+    /// <returns>The remote's HTML.</returns>
     [HttpGet("index.html")]
     [AllowAnonymous]
     [Produces(MediaTypeNames.Text.Html)]
-    public ActionResult GetFinPartyRemote()
+    public ActionResult GetFinPartyRemoteIndex() => ServeRemote();
+
+    private ActionResult ServeRemote()
     {
         var assembly = Assembly.GetExecutingAssembly();
         var resource = $"{typeof(Plugin).Namespace}.Web.party.html";
